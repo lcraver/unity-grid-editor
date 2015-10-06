@@ -1,16 +1,24 @@
 ﻿using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
+using UnityEngine.UI;
+using UnityEngine.Events;
+using UnityEngine.EventSystems;
 
 public class Snap : MonoBehaviour {
 
-    public LSObject testObject = new LSObject();
+    public int currentObject = 0;
+    public int currentEvent = 0;
+    public List<LSObject> objects = new List<LSObject>();
 
     public enum EditorState { position, scale, rotation, color };
-    public EditorState state = EditorState.position; 
+    public EditorState state = EditorState.position;
 
+    public GameObject canvas;
     public GameObject snapVisual;
-    public GameObject objectVisual;
+    public GameObject objectPrevew;
+    public GameObject previewObjectPrefab;
+    public List<GameObject> previewObjects = new List<GameObject>();
     public Vector3 mousePos;
 
     public bool showMain = true;
@@ -71,12 +79,41 @@ public class Snap : MonoBehaviour {
     public Vector2 clickPos;
     public Vector2 clickMove;
 
+    public void UpdateEventSelection(int selection)
+    {
+        currentEvent = selection;
+    }
+
     void Update ()
     {
+        int index = 0;
+        LSObject o = objects[currentObject];
+        objectPrevew.GetComponent<LineRenderer>().SetVertexCount(o.events.Count);
+        foreach (LSObject.Event e in o.events)
+        {
+            objectPrevew.GetComponent<LineRenderer>().SetPosition(index, new Vector3(e.position.x, e.position.y, -1));
+            if (!objectPrevew.transform.FindChild(index.ToString()))
+            {
+                previewObjects.Insert(index, Instantiate(previewObjectPrefab));
+                previewObjects[index].transform.SetParent(objectPrevew.transform);
+                previewObjects[index].name = index.ToString();
 
-        objectVisual.transform.position = testObject.position;
-        objectVisual.transform.rotation = Quaternion.Euler(0, 0, testObject.rotation);
-        objectVisual.transform.localScale = testObject.scale;
+                int i = index;
+                previewObjects[index].transform.FindChild("name").GetComponent<Text>().text = i.ToString();
+                previewObjects[index].GetComponent<SelectEvent>().editor = this.gameObject;
+                previewObjects[index].GetComponent<SelectEvent>().selection = i;
+            }
+            else
+            {
+                previewObjects[index].transform.position = e.position;
+                if (e.scale.x > 0 && e.scale.y > 0)
+                    previewObjects[index].GetComponent<RectTransform>().sizeDelta = e.scale;
+                else
+                    previewObjects[index].GetComponent<RectTransform>().sizeDelta = new Vector2(0.25f, 0.25f);
+                previewObjects[index].GetComponent<RectTransform>().rotation = Quaternion.Euler(0, 0, e.rotation);
+            }
+            index++;
+        }
 
         gridSizeX = Mathf.RoundToInt(Camera.main.orthographicSize * 3.75f);
         gridSizeY = Mathf.RoundToInt(Camera.main.orthographicSize * 2.25f);
@@ -101,6 +138,23 @@ public class Snap : MonoBehaviour {
             clickMove = new Vector3((Mathf.RoundToInt(clickMove.x * temp)) / temp, (Mathf.RoundToInt(clickMove.y * temp)) / temp);
         }
 
+        if (clickBegin && Input.GetMouseButton(0) || clickBegin && Input.GetMouseButton(1))
+        {
+            if (clickMove != Vector2.zero)
+            {
+                if (clickLeft)
+                {
+                    state = EditorState.position;
+                    objects[currentObject].events[currentEvent].position = clickPos - clickMove;
+                }
+                else
+                {
+                    state = EditorState.scale;
+                    objects[currentObject].events[currentEvent].scale = new Vector2(Mathf.Abs(-clickMove.x), Mathf.Abs(-clickMove.y)) * 2;
+                }
+            }
+        }
+
         if (clickBegin && Input.GetMouseButtonUp(0) || clickBegin && Input.GetMouseButtonUp(1))
         {
             if (clickMove == Vector2.zero)
@@ -108,13 +162,15 @@ public class Snap : MonoBehaviour {
                 if (clickLeft)
                 {
                     state = EditorState.rotation;
-                    testObject.rotation += 15;
+                    objects[currentObject].events[currentEvent].rotation += 45;
+                    if (objects[currentObject].events[currentEvent].rotation >= 360)
+                        objects[currentObject].events[currentEvent].rotation = 0;
                     clicks.Add(new click(new Vector2(mousePos.x, mousePos.y)));
                 }
                 else
                 {
                     state = EditorState.color;
-                    testObject.color += 1;
+                    objects[currentObject].events[currentEvent].color += 1;
                     clicks.Add(new click(new Vector2(mousePos.x, mousePos.y)));
                 }
             }
@@ -123,13 +179,13 @@ public class Snap : MonoBehaviour {
                 if (clickLeft)
                 {
                     state = EditorState.position;
-                    testObject.position = clickPos - clickMove;
+                    objects[currentObject].events[currentEvent].position = clickPos - clickMove;
                     drags.Add(new drag(clickPos, clickPos - clickMove, -clickMove));
                 }
                 else
                 {
                     state = EditorState.scale;
-                    testObject.scale = -clickMove;
+                    objects[currentObject].events[currentEvent].scale = new Vector2(Mathf.Abs(-clickMove.x), Mathf.Abs(-clickMove.y)) * 2;
                     drags.Add(new drag(clickPos, clickPos - clickMove, -clickMove));
                 }
             }

@@ -12,7 +12,7 @@ public class SelectEvent : MonoBehaviour, IPointerEnterHandler {
     {
         if (!Input.GetMouseButton(0) && !Input.GetMouseButton(1))
         {
-            editor.GetComponent<Snap>().UpdateEventSelection(selection);
+            //editor.GetComponent<Snap>().UpdateEventSelection(selection);
         }
     }
 }
